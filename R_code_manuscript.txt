@@ -1,0 +1,982 @@
+-------------------
+# GENERAL INFORMATION
+-------------------
+
+#1. Datasets 
+
+#(A)Soil respiration in 2023 (kfc_soilrespiration.csv)
+#(B)Thaw depth (Thaw_depth_stats.csv)
+#(C)Thaw depth and soil respiration (Thaw_depth.csv)
+#(D)Soil respiration 2023-2024 (respiration_20232024.csv)
+#(E)Organic layer (kfcdata.csv)
+#(F)Incubation CO2 production rates (kfc_sr_incubation.csv)
+#(G)Incubation Total (cumulative) CO2 production (kfc_sr_incubation_cum.csv)
+#(H)WEOC (kfc_chem.csv)
+
+
+#2. Creator Information 
+#Name: Fernanda Santos
+#Institution: ORNL
+#Email: santosf@ornl.gov
+
+
+#R codes below
+#Open the packages
+library(car)
+library(emmeans)
+library(lmerTest) 
+library(ggplot2)
+library(ggthemes)
+library(scales)
+library(ggExtra)
+library(Rmisc)
+library(RColorBrewer)
+library(viridis)
+library(gridExtra)
+library(readr)
+library(stats)
+library(minpack.lm) 
+library(ggpubr) 
+library(ppcor)
+library(dplyr)
+library(lme4)
+library(tidyverse)
+library(plyr)
+library(forecast)
+library(data.table) 
+library(writexl)
+library(lubridate)
+library(reshape2)
+library(ggallin) 
+library(lmerTest)
+library(MuMIn)
+library(rcompanion)
+library(sjPlot)
+library(sjmisc)
+library(vegan)
+library(sjPlot)
+library(lattice)
+library(patchwork) 
+library(effects)
+library(broom.mixed) 
+
+
+#Set the directory where the files are
+setwd("")
+
+
+
+#FIGURE 2 - Soil respiration in repeated burns and reference site measured in 2023
+
+respiration <- read.csv("kfc_respiration.csv")
+head(respiration)
+
+#Factor fire
+respiration$burn<- factor(respiration$burn, levels= c("Unburned","Burned")) #this ensures burned versus unburned
+respiration$timesburned<- factor(respiration$timesburned, levels= c("0","3","4")) #this ensures the order of the fire frequency treatments
+respiration$tsf<- factor(respiration$tsf, levels= c("0","4","8")) #this ensures the order of the time since last fire treatments
+
+
+# 2019 versus 2015
+#Remove the unburned treatment
+resp_nounburned <- respiration[-c(1:9), ]#Remove first rows that belongs to the unburned treatment
+
+
+#FIGURE 2a - Burned versus unburned soil respiration
+BvsUNRboxplot <- ggplot(respiration, aes(x= burn, y=resp, fill=burn)) + ggtitle("(a)")+ geom_boxplot(colour="black", width =0.3) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + ylab(bquote('SR ( '*mu~'mol' ~CO[2]~ m^-2~s^-1*')')) + scale_fill_brewer(name= "Burn status", palette = "PuRd") + scale_x_discrete("", labels = c("Unburned" = "Unburned", "Burned" ="Burned")) 
+BvsUNRboxplot
+
+# FIGURE 2b - 2019 fire x 2015 fire
+brespboxplot <- ggplot(resp_nounburned, aes(x= tsf, y=resp, fill=timesburned)) +ggtitle("(b)")+ geom_boxplot(colour="black",width =0.3) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + ylab(bquote(''))+scale_fill_viridis(discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("Year of last fire", labels = c("4" ="2019", "8"="2015")) 
+brespboxplot
+
+#Figure 2c - Soil moisture measured in 2023
+moist5boxplot <- ggplot(resp_nounburned, aes(x= tsf, y=moist, fill=timesburned)) + ggtitle("(c)") + geom_boxplot(colour="black", width=0.3) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=("Year of last fire"), y=("")) + ylab(expression(paste("Soil moisture (", m^3, "/", m^3,  ")", sep=""))) + scale_fill_viridis("Year of last fire", discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("", labels = c("4" ="2019", "8"="2015"))
+moist5boxplot
+
+#Figure 2d - Soil temperature measured in 2023 
+temp5boxplot <- ggplot(resp_nounburned, aes(x= tsf, y=temp5, fill=timesburned)) + ggtitle("(d)") +geom_boxplot(colour="black", width=0.3) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("Soil Temperature (oC)")) + scale_fill_viridis("Year of last fire", discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("", labels = c("4" ="2019", "8"="2015"))
+temp5boxplot
+
+#Figure 2e - Soil temperature measured in 2023 
+temp10boxplot <- ggplot(resp_nounburned, aes(x= tsf, y=temp10, fill=timesburned)) + ggtitle("(e)")+ geom_boxplot(colour="black", width=0.3) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("Soil Temperature (oC)")) + scale_fill_viridis("Year of last fire", discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("", labels = c("4" ="2019", "8"="2015"))
+temp10boxplot
+
+#Add plots together for the manuscript -  this is Figure 2
+BvsUNRboxplot | brespboxplot |(moist5boxplot/temp5boxplot / temp10boxplot) + plot_layout(axis_titles = "collect", design = "AA\nBC")
+
+
+
+#Statistical analysis for Figure 2
+#Normality test
+#burned
+shapiro.test(resp_nounburned$resp)
+shapiro.test(resp_nounburned$resp) 
+shapiro.test(resp_nounburned$resp_microgc) 
+shapiro.test(resp_nounburned$temp5)
+shapiro.test(resp_nounburned$moist)
+shapiro.test(resp_nounburned$temp10)
+
+#Burned and unburned
+shapiro.test(respiration$resp)  
+shapiro.test(respiration$thawdepth)  
+shapiro.test(respiration$resp_microgc) 
+
+
+#Transform data
+resp_log <- log(respiration$resp)
+shapiro.test(resp_log) #normal
+respnb_log <- log(resp_nounburned$resp)
+shapiro.test(respnb_log) #normal
+respmicrogc_log <- log(respiration$resp_microgc)
+shapiro.test(respmicrogc_log) #normal
+
+#Welch Two Sample t-test burned versus unburned
+t.test(temp5 ~ burn, data=respiration) 
+t.test(resp_log ~ burn, data=respiration) 
+t.test(resp_microgc ~ burn, data=respiration) 
+
+# 2019 fire versus 2015 fire
+t.test(temp5 ~ tsf, data=resp_nounburned) 
+t.test(temp10 ~ tsf, data=resp_nounburned) 
+t.test(moist ~ tsf, data=resp_nounburned) 
+t.test(respnb_log ~ tsf, data=resp_nounburned) 
+t.test(respmicrogc_nb_log ~ tsf, data=resp_nounburned) 
+
+#2019 fire versus 2015 fire - Thaw depth
+t.test(thawdepth~tsf, data=resp_nounburned) # Welch Two Sample t-test not significant p=0.97
+
+
+
+#Figure 3 THAW DEPTH
+al <- read.csv("Thaw_depth_stats.csv",fileEncoding="UTF-8-BOM", header=TRUE) #Use a single dataset with all the thaw depth data
+
+al$bstatus<- factor(al$bstatus, levels= c("unburned","burned")) #this ensures the order of burn status
+al$year<- factor(al$year, levels= c("2022","2023", "2024")) #this ensures the order of the sampling year
+
+al_2022_data <-subset(al, year == "2022")
+al_2023_data <-subset(al, year == "2023")
+al_2024_data <-subset(al, year == "2024")
+
+albox22 <- ggplot(al_2022_data, aes(x= bstatus, y=td, fill=bstatus)) + ggtitle("(a)") +geom_boxplot(colour="black") + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("Thaw Depth (cm)")) + scale_y_continuous(breaks=seq(0,140,by=20), trans = "reverse", limits=c(140,0)) + scale_fill_brewer(name= "Burn status", palette = "Paired")  + scale_x_discrete("", labels = c("unburned" ="Unburned", "burned"="Burned")) + annotate("text", x = 1, y = 0.5, label = paste("p-value =", 0.594))
+
+albox23 <- ggplot(al_2023_data, aes(x= bstatus, y=td, fill=bstatus)) + ggtitle("(b)") + geom_boxplot(colour="black") + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("Thaw Depth (cm)")) + scale_y_continuous(breaks=seq(0,140,by=20), trans = "reverse", limits=c(140,0)) + scale_fill_brewer(name= "Burn status", palette = "Paired")  + scale_x_discrete("", labels = c("unburned" ="Unburned", "burned"="Burned")) + annotate("text", x = 1, y = 30, label = paste("p-value <", 0.001))
+
+albox24 <- ggplot(al_2024_data, aes(x= bstatus, y=td, fill=bstatus)) + ggtitle("(c)") + geom_boxplot(colour="black") + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("Thaw Depth (cm)")) + scale_y_continuous(breaks=seq(0,140,by=20), trans = "reverse", limits=c(140,0)) + scale_fill_brewer(name= "Burn status", palette = "Paired") + scale_x_discrete("", labels = c("unburned" ="Unburned", "burned"="Burned")) + annotate("text", x = 1, y = 20, label = paste("p-value <", 0.001))
+
+grid.arrange(albox22, albox23, albox24, ncol=3)
+
+
+#Statistical analysis for Figure 3 
+#Normality test
+shapiro.test(al$td) # data is NOT normal p 0.01392
+thawdepth_red <- al[-c(25:43), ]#Remove rows that belong to 2022 measurements
+shapiro.test(thawdepth_red$td) # data is normally distributed p 0.1383
+
+#T test
+t.test(td ~ bstatus, data=thawdepth_red) # yes significant
+t.test(td ~ year, data=thawdepth_red) # not sig
+
+#Do a t-test for thaw depth values measured in burned and unburned sites in 2022
+t.test(td ~ bstatus, data=al_2022_data) # p-value = 0.5939
+#Do the same as above for sites measured in 2023
+t.test(td ~ bstatus, data=al_2023_data) # p-value = 3.924e-11
+#Do the same as above for sites measured in 2024
+t.test(td ~ bstatus, data=al_2024_data) # p-value = 2.52e-07
+
+
+
+
+# Supplementary information SI2 - relationship between thaw depth and soil respiration (aggregated measurements in  2023 and 2024)
+
+tddata <- read.csv("Thaw_depth.csv",fileEncoding="UTF-8-BOM", header=TRUE) #Use a single dataset with all the thaw depth data
+tddata$bstatus<- factor(tddata$bstatus, levels= c("unburned","burned")) #this ensures the order of burn status
+tddata$year<- factor(tddata$year, levels= c("2022","2023", "2024")) #this ensures the order of the sampling year
+tddata <- tddata[-c(25:51), ]#Remove rows that belong to 2022 measurements
+tddata[tddata<0] <- NA  # here I wanted to remove the -999 values 
+corrtd_1 <- ggplot(tddata, aes(x= sr, y= td, color=bstatus)) + geom_point(size=5) + ggtitle("(a)")+ geom_smooth(method="lm", se=FALSE) + xlab(bquote('SR ('*mu~'mol' ~CO[2]~ m^-2 ~s^-1*')')) + ylab("Thaw depth (cm)") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "bottom", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid"))+ scale_colour_manual(name = "Burn status", values = c("grey", "darkorange"), labels = c("unburned" = "Unburned", "burned" = "Burned"))+ stat_cor(p.accuracy = 0.001, label.x = 3) 
+corrtd_1
+
+
+tddata <- read.csv("Thaw_depth.csv",fileEncoding="UTF-8-BOM", header=TRUE) #Use a single dataset with all the thaw depth data
+tddata$bstatus<- factor(tddata$bstatus, levels= c("unburned","burned")) #this ensures the order of burn status
+tddata$yburned<- factor(tddata$yburned, levels= c("2015","2019")) #this ensures the order of the fire year
+tddata <- tddata[-c(1:51), ]#Remove rows that belong to all unburned and all 2022 measurements
+tddata[tddata<0] <- NA  # here I wanted to remove the -999 values 
+corrtd_2 <-ggplot(data=drop_na(tddata, yburned), aes(x= sr, y= td, color=yburned)) + geom_point(size=5) + ggtitle("(b)") + geom_smooth(method="lm", se=FALSE) + xlab(bquote('SR ('*mu~'mol' ~CO[2]~ m^-2 ~s^-1*')')) + ylab("Thaw depth (cm)") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "bottom", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + stat_cor(p.accuracy = 0.001, label.x = 3,label.y.npc = "top", geom="label", fill="gray") + scale_color_viridis("Year of last fire", na.value = "transparent", discrete = TRUE, option = "D", direction = -1)
+corrtd_2
+
+
+tddata <- read.csv("Thaw_depth.csv",fileEncoding="UTF-8-BOM", header=TRUE) #Use a single dataset with all the thaw depth data
+tddata$year<- factor(tddata$year, levels= c("2022","2024","2023")) #this ensures the order of the sampling year
+tddata <- tddata[-c(1:51), ]#Remove rows that belong to all unburned and all 2022 measurements
+tddata[tddata<0] <- NA  # here I wanted to remove the -999 values 
+corrtd_3 <-ggplot(tddata,aes(x= sr, y= td, color=year)) + geom_point(size=5) + ggtitle("(c)") + geom_smooth(method="lm", se=FALSE) + xlab(bquote('SR ('*mu~'mol' ~CO[2]~ m^-2 ~s^-1*')')) + ylab("Thaw depth (cm)") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "bottom", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + stat_cor(p.accuracy = 0.001, label.x = 3, label.y.npc = "top", geom="label", fill="gray") + scale_color_viridis("Sampling year", alpha=0.5, na.value = "transparent", discrete = TRUE, option = "H", direction = 1)
+corrtd_3
+
+corrtd_1|(corrtd_2/corrtd_3) + plot_layout(axis_titles = "collect")
+
+
+
+
+#FIGURE 4 - Soil respiration in relation to PFT and soil moisture in 2023 and 2024
+
+data1 <- read.csv("respiration_20232024.csv",fileEncoding="UTF-8-BOM", header=TRUE) 
+data1$plant<- factor(data1$plant, levels= c("Forbs","Shrubs","Dry graminoids", "Wet graminoids")) 
+
+
+burned_data1 <-subset(data1, bstatus == "burned" & yburned == "2019")# Only keep the 2019 fire site
+
+# FIGURE 4a - boxplot
+
+burned_data1$plant<- factor(burned_data1$plant, levels= c("Forbs", "Shrubs", "Dry graminoids", "Wet graminoids")) #this ensures the order of plant functional types
+fig4a <- ggplot(burned_data1, aes(x= plant, y=sr, fill=plant)) + ggtitle("(a)") +geom_boxplot(colour="black", width=0.5, position = position_dodge(width = 0.7)) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitterdodge(jitter.width=0.5, seed=1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""),y=(bquote('Soil respiration ('*mu~'mol' ~CO[2]~ m^-2 ~s^-1*')'))) + scale_fill_manual(name = "Tundra PFTs", values = c("dark green", "orange","darkblue", "hotpink")) + scale_x_discrete("PFTs", labels = c("Forbs" = "Forbs", "Shrubs" = "Shrubs", "Dry graminoids" = "Dry G.", "Wet graminoids"= "Wet G.")) 
+fig4a
+
+
+# Figure 4b - scatter plot
+
+fig4b <-ggplot(burned_data1, aes(x= moisture, y= sr)) + ggtitle("(b)") + geom_point(size=5, alpha=0.5, color="blue") + geom_smooth(method="lm", se=TRUE) + ylab(bquote('Soil respiration ('*mu~'mol' ~CO[2]~ m^-2 ~s^-1*')')) + xlab(expression(paste("Soil moisture (", m^3, "/", m^3,  ")", sep=""))) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid"))
+fig4b
+
+fig4a|fig4b
+
+
+# Statistical analysis for Figure 4
+
+#Normality test 
+shapiro.test(burned_data1$sr) 
+shapiro.test(burned_data1$moisture)
+shapiro.test(burned_data1$td) 
+shapiro.test(burned_data1$temp5)
+shapiro.test(burned_data1$temp10) 
+shapiro.test(burned_data1$elevation_m) 
+
+temp5b_sqrt <- sqrt(burned_data1$temp5) 
+shapiro.test(temp5b_sqrt) 
+
+elev_sqrt <- sqrt(burned_data1$elevation_m)
+shapiro.test(elev_sqrt)
+
+temp10_log <- log(burned_data1$temp10)
+shapiro.test(temp10_log)
+
+burned_data1_td <- burned_data1[-c(16:24), ]#Remove rows that did not have thaw depth data 
+shapiro.test(burned_data1_td$td)
+
+#ANOVA for diff among PFTs only. This is not from a mixed-effect model
+anova_data1 <- aov(sr ~ plant, data = burned_data1) # Soil respiration in relation to PFTs only in 2023 and 2024
+summary(anova_data1)
+TukeyHSD(anova_data1)
+
+#Mixed-effects model for 2023 + 2024 measurements
+
+# Make sure 'Forbs' are the reference instead of 'dry graminoids'
+burned_data1$plant <- relevel(burned_data1$plant, ref = "Forbs")
+options(contrasts=c("contr.sum","contr.poly"))
+model_2 <-lmer(sr ~ plant + moisture + (1|date), data = burned_data1)
+emmeans(model_2, "plant")
+AIC(model_2) 
+vif(model_2) 
+anova(model_2) 
+summary(model_2)
+fixef(model_2)["plant"] #extracs fixed-effects coefficients or fixed effect slope
+fixef(model_2)["moisture"] #extracs fixed-effects coefficients or fixed effect slope
+coef(summary(model_2)) 
+emmeans::emmeans(model_2, ~ plant)
+m2 <- allEffects(model_2) 
+plot(m2) 
+
+
+#Figure SI6 - random effects for Figure 4
+
+randoms<-ranef(model_2, condVar = TRUE)
+qq <- attr(ranef(model_2, condVar = TRUE)[[1]], "postVar")
+rand.interc<-randoms$date
+df<-data.frame(Intercepts=randoms$date[,1],sd.interc=2*sqrt(qq[,,1:length(qq)]),lev.names=rownames(rand.interc))
+df$lev.names<-factor(df$lev.names,levels=df$lev.names[order(df$Intercepts)])
+ra <- ggplot(df,aes(lev.names,Intercepts,shape=lev.names)) 
+#Added horizontal line at y=0, error bars to points and points with size two
+ra <- ra + geom_hline(yintercept=0) +geom_errorbar(aes(ymin=Intercepts-sd.interc, ymax=Intercepts+sd.interc), width=0,color="black") + geom_point(aes(size=2),alpha=0.5) 
+#Removed legends and with scale_shape_manual point shapes set to 1 and 16
+ra <- ra + guides(size="none", shape="none")
+#Changed appearance of plot (black and white theme) and x and y axis labels
+ra <- ra + theme_bw() + xlab("Sampling Dates") + ylab("Intercept")
+#Final adjustments of plot
+ra <- ra + theme_minimal() + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=12,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=12), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid"))
+#To put levels on y axis you just need to use coord_flip()
+ra <- ra+ coord_flip()
+print(ra)
+
+
+
+# Supplementary material S3 showing Moisture is negatively associated with elevation in the 2019 burned sites 
+
+data1 <- read.csv("respiration_20232024.csv",fileEncoding="UTF-8-BOM", header=TRUE) #Use a single dataset with all 2023 and 2024 data
+data1$plant<- factor(data1$plant, levels= c("Forbs","Shrubs","Dry graminoids", "Wet graminoids")) #this ensures the order of plant functional types
+
+
+
+#Figure SI3- a
+burned_data <-subset(data1, bstatus == "burned" & yburned == "2019")
+#Stats
+#Two Sample t-test upper slope versus lower slope
+t.test(moisture ~ hillslope, data=burned_data)
+
+ma <- summarySE(burned_data, measurevar="moisture", groupvars=c("hillslope"), na.rm=TRUE)# only burned sampling points
+plot_ma <- ggplot(ma, aes(x= hillslope, y=moisture, fill=hillslope)) + geom_bar(stat="identity", position="dodge", width=0.3, colour="black") + geom_errorbar(aes(ymin=moisture-se,ymax=moisture+se), width=0.2, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=("")) + ylab(expression(paste("Soil moisture (", m^3, "/", m^3,  ")", sep=""))) + ylim(0, 0.8) + scale_fill_manual(name = "Hillslope position", values = c("grey", "brown")) + scale_x_discrete("", labels = c("u" = "Upper slope", "f" = "Lower slope")) + annotate("text", x = 1, y = 0.6, label = paste("p-value =", 0.059))
+plot_ma
+
+
+#Figure SI3- b
+#Remove unburned samples and keep data for the 2019fire site but add only 2024 measurements
+burned_data1 <-subset(data1, bstatus == "burned" & yburned == "2019" & year == "2024")
+
+mb <- summarySE(burned_data1, measurevar="moisture", groupvars=c("hillslope"), na.rm=TRUE)# only burned sampling points
+plot_mb <- ggplot(mb, aes(x= hillslope, y=moisture, fill=hillslope)) + ggtitle("(b)") + geom_bar(stat="identity", position="dodge", width=0.3, colour="black") + geom_errorbar(aes(ymin=moisture-se,ymax=moisture+se), width=0.2, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=("")) + ylab(expression(paste("Soil moisture (", m^3, "/", m^3,  ")", sep=""))) + ylim(0, 0.8) + scale_fill_manual(name = "Hillslope position", values = c("grey", "brown")) + scale_x_discrete("", labels = c("u" = "Upper slope", "f" = "Lower slope")) + annotate("text", x = 1, y = 0.5, label = paste("p-value =", 0.0185))
+plot_mb 
+
+
+#Figure SI3- c
+burned_data2 <-subset(data1, bstatus == "burned" & yburned == "2019" & year == "2023")
+
+mc <- summarySE(burned_data2, measurevar="moisture", groupvars=c("hillslope"), na.rm=TRUE)# only burned sampling points
+plot_mc <- ggplot(mc, aes(x= hillslope, y=moisture, fill=hillslope)) + ggtitle("(a)") + geom_bar(stat="identity", position="dodge", width=0.1, colour="black") + geom_errorbar(aes(ymin=moisture-se,ymax=moisture+se), width=0.05, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=("")) + ylab(expression(paste("Soil moisture (", m^3, "/", m^3,  ")", sep=""))) + ylim(0, 0.8) + scale_fill_manual(name = "Hillslope position", values = c("#666666")) + scale_x_discrete("", labels = c("f" = "Lower slope")) 
+plot_mc
+
+plot_m2|plot_m + plot_layout(axis_titles = "collect")
+
+
+
+
+
+
+#Figure 5 Burned vs unburned
+
+#Start reading data
+kfcsoilc <- read.csv("kfcdata.csv",fileEncoding="UTF-8-BOM", header=TRUE)# # this version has wet samples for unburned and burned in 2019 and only has one unburned treatment which is the unburned in the polygon area at the mile post80#  I used this script on 11/21/23 for AGU
+
+head (kfcsoilc) # check the column names and the first rows of the data
+
+kfcsoil <- na.omit(kfcsoilc) #this is very important otherwise it will show an additional variable called NA
+
+#Factor fire frequency treatments
+kfcsoil$burn<- factor(kfcsoil$burn, levels= c("Unburned","Burned")) #this ensures the unburned treatment shows up first in the x axis
+kfcsoil$site<- factor(kfcsoil$site, levels= c("unburned","1971","2002","2015(4X)","2019(2X)", "2019(3X)")) #this ensures the order of the fire frequency treatments
+#Factor last year burned
+kfcsoil$ylastburned<- factor(kfcsoil$ylastburned, levels= c("unburned","2019", "2015", "2002", "1971")) #this ensures the order of the year of the last fire
+kfcsoil$timesburned<- factor(kfcsoil$timesburned, levels= c("0","1","2","3","4")) #this ensures the order of the fire frequency treatments
+kfcsoil$ff<- factor(kfcsoil$ff, levels= c("1","2")) # 2 means more than one fire in terms of frequency or times burned
+
+
+
+#Boxplot for organic matter thickness in centimeters and no legend (burned versus unburned)
+#Factor burned and unburned treatments
+
+
+thickboxplot <- ggplot(kfcsoil, aes(x= burn, y=omthick, fill=burn)) + ggtitle("(a)") + geom_boxplot(colour="black",width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""), y=("OL \n thickness (cm)")) + scale_fill_brewer(name= "", palette = "Dark2")
+thickboxplot
+
+#Boxplot for carbon concentration in g/kg
+
+Cboxplot <- ggplot(kfcsoil, aes(x= burn, y=cmass, fill=burn)) + ggtitle("(c)")+ geom_boxplot(colour="black",width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""), y=(expression(paste("C concentration (g kg"^"-1",")")))) + scale_fill_brewer(name= "", palette = "Dark2")
+Cboxplot
+
+#Boxplot for nitrogen concentration in g/kg although this will be supplemental
+
+Nboxplot <- ggplot(kfcsoil, aes(x= burn, y=nmass, fill=burn)) + ggtitle("")+ geom_boxplot(colour="black",width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""), y=(expression(paste("N Concentration (g kg"^"-1",")")))) + scale_fill_brewer(name= "", palette = "Dark2")
+Nboxplot
+
+
+#Boxplot for bulk density in cm-3
+
+bdboxplot <- ggplot(kfcsoil, aes(x= burn, y=bd, fill=burn)) + ggtitle("(b)")+ geom_boxplot(colour="black",width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + theme_minimal() + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""), y=(expression(paste("BD (g cm"^"-3",")")))) + scale_fill_brewer(name= "", palette = "Dark2")
+bdboxplot
+
+#Boxplot for carbon storage in kg m-2
+
+Sboxplot <- ggplot(kfcsoil, aes(x= burn, y=cstock, fill=burn)) + ggtitle("(d)") + geom_boxplot(colour="black",width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""), y=(expression(paste("C stock (g C m"^"-2",")")))) + scale_fill_brewer(name= "", palette = "Dark2")
+Sboxplot
+
+# C:N ratios and aqueous C in the organic layer need to run another dataset first
+
+Rboxplot <- ggplot(kfcsoil, aes(x= burn, y=ratio, fill=burn)) + ggtitle("(e)") + geom_boxplot(colour="black",width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + labs(x=(""), y=("C:N ratio")) + scale_fill_brewer(name= "", palette = "Dark2")
+Rboxplot
+
+#DOC needs to open another dataset
+
+setwd("C:/Users/f20/Desktop/ORNL_2025/DISTURBANCE_ECOLOGY/NGEE_Arctic/NGEEArctic_Phase_3/Manuscript_Santos_Breen_2024/MS_data")
+doc <- read.csv("kfc_chem.csv", fileEncoding="UTF-8-BOM", sep=",", header=TRUE)
+doc$Fire_h<- factor(doc$Fire_h, levels= c("Unburned","Burned")) #this ensures burned versus unburned
+
+docboxplot <- ggplot(doc, aes(x= Fire_h, y=DOC, fill=Fire_h)) + ggtitle("(f)") + geom_boxplot(colour="black", width=0.2) + geom_jitter(shape=21, size=3, alpha=0.4, position=position_jitter(0.1)) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linewidth = "solid")) + labs(x=(""), y=(expression(paste("WEOC (mg C g"^"-1",")")))) + scale_fill_brewer(name= "", palette = "Dark2") + scale_x_discrete("", labels = c("Unburned" = "Unburned", "Burned" ="Burned")) 
+docboxplot
+
+
+grid.arrange(thickboxplot, bdboxplot, Cboxplot,Sboxplot, Rboxplot,docboxplot, nrow=3, ncol=2)
+
+
+#Two Sample t-test burn versus unburned
+
+plot(omthick ~ burn, data=kfcsoil)
+t.test(omthick ~ burn, data=kfcsoil)
+
+plot(cmass ~ burn, data=kfcsoil)
+t.test(cmass ~ burn, data=kfcsoil)
+
+plot(nmass ~ burn, data=kfcsoil)
+t.test(nmass ~ burn, data=kfcsoil)
+
+plot(nstock ~ burn, data=kfcsoil)
+t.test(nstock ~ burn, data=kfcsoil)
+
+plot(bd ~ burn, data=kfcsoil)
+t.test(bd ~ burn, data=kfcsoil)
+
+plot(cstock ~ burn, data=kfcsoil)
+t.test(cstock ~ burn, data=kfcsoil)
+
+t.test(ratio ~ burn, data=kfcsoil)
+
+
+
+
+
+# Supplementary material S4 showing OL thickness and C concentrations across time since fire and times burned
+
+
+#please remove unburned category from the plot
+kfc_nounburned <- kfcsoil[-c(1:6), ]#Remove first row that belongs to the unburned treatment
+
+#Normality test for organic layer thickness
+shapiro.test(kfc_nounburned$omthick) #normality test normal p 0.4258
+#Normality test for carbon mass or concentration
+shapiro.test(kfc_nounburned$cmass) #normality test NOT normal p 0.023
+cmass_log <- sqrt(kfc_nounburned$cmass)
+shapiro.test(cmass_log)#normality test NOT normal even after transformations
+shapiro.test(kfc_nounburned$nmass)#normality test normal 
+shapiro.test(kfc_nounburned$cstock)#normality test NOT normal  p-value = 0.03372
+#Remove negative values first
+kfc_nounburned[kfc_nounburned<0] <- NA  # here I wanted to remove the -999 values for missing values for thaw depth  
+shapiro.test(kfc_nounburned$thawdepth)# NORMAL once we remove the negative values
+shapiro.test(kfc_nounburned$bd)# NOT normal
+
+
+#t-test 1 time burned versus > 2 times burned
+
+t.test(omthick ~ ff, data=kfc_nounburned) # Welch Two Sample t-test not significant  p-value = 0.9058
+wilcox.test(cmass ~ ff, data=kfc_nounburned) # significant p-value = 0.007253
+t.test(nmass ~ ff, data=kfc_nounburned) # Welch Two Sample t-test p-value = 0.9213
+wilcox.test(cstock ~ ff, data=kfc_nounburned) # not significant p-value = 0.7544
+
+
+
+#ANOVA
+oldepth_fireage <- aov(omthick ~ ylastburned / timesburned, data = kfc_nounburned)
+summary(oldepth_fireage)
+oldepth_firef <- aov(omthick ~ timesburned, data = kfc_nounburned)# checking the effect of fire frequency alone just in case
+summary(oldepth_firef) #p p 0.135
+
+
+#Generalized model for c mass
+cmass.Gamma<- glmer(cmass ~ ylastburned + (1|timesburned), family=Gamma(link=log), data=kfc_nounburned)# is singular
+summary(cmass.Gamma)
+
+#Let's try a non-parametric test
+friedman.test(cmass ~ ylastburned | timesburned, data = kfc_nounburned)
+kruskal.test(cmass ~ ylastburned, kfc_nounburned)
+#Kruskal-Wallis chi-squared = 7.6537, df = 3, p-value = 0.05374
+kruskal.test(cmass ~ timesburned, kfc_nounburned)
+#Kruskal-Wallis chi-squared = 7.1934, df = 3, p-value = 0.06598
+
+#Try PERMANOVA permutational multivariate analysis of variance later
+
+#Mixed-effect model
+#Remove negative values first
+kfc_nounburned[kfc_nounburned<0] <- NA  # here I wanted to remove the -999 values 
+
+model_A <- glmer(thawdepth ~ omthick+ (1|ylastburned), family=Gamma(link=log), data = kfc_nounburned) 
+summary(model_A) # p = 0.446 
+
+model_B <- glmer(thawdepth ~ bd + I(bd^2)+ (1|ylastburned), family=Gamma(link=log), data = kfc_nounburned) 
+summary(model_B) #AIC=91
+
+
+
+#Figure SI4 bar plots
+# OL thickness
+#All years same bar colors
+
+kfc_nounburned <- kfcsoil[-c(1:6), ]#Remove first rows that belongs to the unburned treatment
+
+a <- summarySE(kfc_nounburned, measurevar="omthick", groupvars=c("timesburned", "ylastburned"), na.rm=TRUE)
+e <- summarySE(kfc_nounburned, measurevar="cmass", groupvars=c("timesburned", "ylastburned"), na.rm=TRUE)
+n <- summarySE(kfc_nounburned, measurevar="nmass", groupvars=c("timesburned", "ylastburned"), na.rm=TRUE)
+g <- summarySE(kfc_nounburned, measurevar="cstock", groupvars=c("timesburned", "ylastburned"), na.rm=TRUE)
+
+
+OLdepthplot <- ggplot(a, aes(x= ylastburned, y=omthick, fill=timesburned)) + ggtitle("(A)") + geom_bar(stat="identity", position="dodge", width=0.4, colour="black") + geom_errorbar(aes(ymin=omthick-se,ymax=omthick+se), width=0.2, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=(""), y=("OL thickness (cm)")) + scale_fill_brewer(name= "Burn frequency", palette = "Blues") + scale_x_discrete("Time since last fire",labels = c("0" = "Unburned", "2019" ="3", "2015"="7", "2002"="20", "1971"="51")) +scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) 
+OLdepthplot
+
+
+cmassplot <- ggplot(e, aes(x= ylastburned, y=cmass, fill=timesburned)) + ggtitle("(B)") + geom_bar(stat="identity", position="dodge", width=0.4, colour="black") + geom_errorbar(aes(ymin=cmass-se,ymax=cmass+se), width=0.2, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=(""), y=("C concentration (g/kg)")) + scale_fill_brewer(name= "Burn frequency", palette = "Blues") + scale_x_discrete("Time since last fire",labels = c("0" = "Unburned", "2019" ="3", "2015"="7", "2002"="20", "1971"="51"))+ scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) 
+cmassplot
+
+
+nmassplot <- ggplot(n, aes(x= ylastburned, y=nmass, fill=timesburned)) + ggtitle("(C)") + geom_bar(stat="identity", position="dodge", width=0.4, colour="black") + geom_errorbar(aes(ymin=nmass-se,ymax=nmass+se), width=0.2, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=(""), y=("N concentration (g/kg)")) + scale_fill_brewer(name= "Burn frequency", palette = "Blues") + scale_x_discrete("Time since last fire",labels = c("0" = "Unburned", "2019" ="3", "2015"="7", "2002"="20", "1971"="51")) +scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) 
+nmassplot
+
+cstockplot <- ggplot(g, aes(x= ylastburned, y=cstock, fill=timesburned)) + ggtitle("(D)") + geom_bar(stat="identity", position="dodge", width=0.4, colour="black") + geom_errorbar(aes(ymin=cstock-se,ymax=cstock+se), width=0.2, position=position_dodge (0.4), colour= "black") + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +labs(x=(""), y=("C stocks (g m2)")) + scale_fill_brewer(name= "Burn frequency", palette = "Blues") + scale_x_discrete("Time since last fire",labels = c("0" = "Unburned", "2019" ="3", "2015"="7", "2002"="20", "1971"="51"))+scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) 
+cstockplot
+
+ggarrange(OLdepthplot, cmassplot, nmassplot, cstockplot, ncol=2, nrow=2, common.legend = TRUE, legend="bottom") # much better
+
+
+
+
+
+
+#FIGURE 6  Bulk density thaw depth and WEOC along a recovery trajectory
+ 
+#please remove unburned category from the plot
+kfc_nounburned <- kfcsoil[-c(1:6), ]#Remove first row that belongs to the unburned treatment
+
+#Thaw depth
+
+kfc_nounburned[kfc_nounburned<0] <- NA  # here I wanted to remove the -999 values 
+thawde <- summarySE(kfc_nounburned, measurevar="thawdepth", groupvars=c("ylastburned","timesburned"), na.rm=TRUE)
+
+tdplot <- ggplot(thawde, aes(x= ylastburned, y=thawdepth, fill=timesburned)) + ggtitle("(b)")+ geom_point(stat="identity", position=position_dodge(width=0.6), size=6, shape=21 ) + geom_errorbar(aes(ymin=thawdepth-se,ymax=thawdepth+se), width=0.2, position=position_dodge (0.6), colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=12), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("Thaw Depth (cm)")) + scale_y_continuous(breaks=seq(0,140,by=20), trans = "reverse", limits=c(140,0)) + scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("Time since last fire",labels = c("2019" ="3", "2015"="7", "2002"="20", "1971"="51")) + geom_hline(yintercept = 15.75, color = "blue", linetype = "dashed")
+tdplot
+
+#Bulk Density
+
+bdens <- summarySE(kfc_nounburned, measurevar="bd", groupvars=c("ylastburned", "timesburned"), na.rm=TRUE)
+
+bulkdplot <- ggplot(bdens, aes(x= ylastburned, y=bd, fill=timesburned)) + ggtitle("(a)")+ geom_point(stat="identity", position=position_dodge(width=0.6), size=6, shape=21 ) + geom_errorbar(aes(ymin=bd-se,ymax=bd+se), width=0.2, position=position_dodge (0.6), colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=12), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=(expression(paste("Density of the OL (g cm"^"-3",")")))) +  scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("Time since last fire",labels = c("2019" ="3", "2015"="7", "2002"="20", "1971"="51")) + geom_hline(yintercept = 0.102, color = "blue", linetype = "dashed")
+bulkdplot
+
+# WEOC extracted from OL
+
+doc <- read.csv("kfc_chem.csv", fileEncoding="UTF-8-BOM", sep=",", header=TRUE)
+doc$Fire_h<- factor(doc$Fire_h, levels= c("Unburned","Burned")) #this ensures burned versus unburned
+doc_nounburned <- doc[-c(1:3), ]#Remove first rows that belongs to the unburned treatment
+doc_nounburned$Last_YR_Burned <- factor(doc_nounburned$Last_YR_Burned, levels= c("2019","2015","2002","1971")) #this ensures order
+doc_nounburned$Times_Burned <- factor(doc_nounburned$Times_Burned, levels= c("1","2","3","4")) #this ensures order
+weoc_mean <- summarySE(doc_nounburned, measurevar="DOC", groupvars=c("Last_YR_Burned", "Times_Burned"), na.rm=TRUE)
+doc_nounburned <- as.data.frame(doc_nounburned)
+
+docplot <- ggplot(weoc_mean, aes(x= Last_YR_Burned, y=DOC, fill=Times_Burned)) + ggtitle("(c)")+ geom_point(stat="identity", position=position_dodge(width=0.6), size=6, shape=21 ) + geom_errorbar(aes(ymin=DOC-se,ymax=DOC+se), width=0.2, position=position_dodge (0.6), colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=12), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=(expression(paste("WEOC (mg g"^"-1",")")))) +  scale_fill_viridis("Times burned", discrete = TRUE, option = "D", direction = -1) + scale_x_discrete("Time since last fire",labels = c("2019" ="3", "2015"="7", "2002"="20", "1971"="51")) + geom_hline(yintercept = 10.46, color = "blue", linetype = "dashed")
+docplot
+
+grid.arrange(bulkdplot, tdplot, docplot, nrow=1, ncol=3)
+
+
+
+
+
+# FIGURE 7 showing relationship between thaw depth and bulk density
+
+# Scatter plot showing bulk density versus thaw depth for all data points
+#Burned & Unburned just in case
+
+kfcsoil[kfcsoil<0] <- NA  # here I wanted to remove the -999 values 
+kfc_nounburned[kfc_nounburned<0] <- NA  # here I wanted to remove the -999 values 
+
+# Scatter plot showing linear correlation between bulk density versus thaw depth for burned samples only
+scat_bdtd <- ggplot(kfc_nounburned, aes(x= bd, y= thawdepth)) + geom_point(size=7, color="grey") + geom_smooth(method="lm", se=TRUE) + ylab("Thaw Depth (cm)") + xlab(expression(paste("Density of the OL (g cm"^"-3",")"))) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) + annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=14), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=14, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "bottom", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid"))
+scat_bdtd
+
+
+#Mixed effects model
+#Run model for all data points
+
+#Run Normality test for thawdepth
+kfcsoil[kfcsoil<0] <- NA  # here I wanted to remove the -999 values 
+kfc_nounburned[kfc_nounburned<0] <- NA  # here I wanted to remove the -999 values 
+
+shapiro.test(kfcsoil$thawdepth) # data is normal if p value is smaller than 0.05
+shapiro.test(kfc_nounburned$thawdepth) # data is normal if p value is smaller than 0.05
+
+#thaw depth is normal because p is 0.4
+ggqqplot(kfcsoil$thawdepth) #visualize the data
+ggqqplot(kfc_nounburned$thawdepth) #visualize the data
+
+#Run Normality test for bulk density 
+shapiro.test(kfcsoil$bd) # data is normal if p value is smaller than 0.05
+shapiro.test(kfc_nounburned$bd) # data is normal if p value is smaller than 0.05
+
+
+model_td4 <- lmer(thawdepth ~ bd + (1|ylastburned), data = kfc_nounburned) # including burned only
+#Here the response variable is normally distributed
+summary(model_td4) #intercept is NOT significant but p =0.0446
+anova(model_td4)
+AIC(model_td4) # 83
+td4 <- allEffects(model_td4)
+plot(td4)
+
+
+
+#Incubation respiration
+
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+inc$tsf <- factor(inc$tsf, levels= c("0","51","20","7","3")) #this ensures order
+inc$timesburned <- factor(inc$timesburned, levels= c("0", "1","2","3","4")) #this ensures order
+inc$incday <- factor(inc$incday, levels= c("2","6","15","30")) #this ensures order
+inc$temp <- factor(inc$temp, levels= c("4","14")) #this ensures order
+
+
+i <- summarySE(inc, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+
+cratesplot1 <- ggplot(i, aes(x= incday, y=co2, col=tsf, group=tsf, fill=temp, shape=timesburned)) + ggtitle("(A)")+ geom_point(aes(color=temp), stat="identity", position=position_dodge(width=0.6), size=5) + geom_errorbar(aes(ymin=co2-se,ymax=co2+se), width=0.2, position=position_dodge (0.6), colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=12), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("DOC (mg L-1)")) + scale_fill_brewer(name= "Incubation temperature", palette = "Set1") + scale_color_brewer(name= "Incubation temperature", palette = "Set1") + scale_x_discrete("Time since last fire",labels = c("2019" ="3", "2015"="7", "2002"="20", "1971"="51"))
+cratesplot1
+
+
+cratesplot2 <- ggplot(i, aes(x= incday, y=co2, col=tsf, group=tsf, shape=timesburned)) + ggtitle("(A)")+ geom_point(stat="identity", position=position_dodge(width=0.6), size=5) + geom_errorbar(aes(ymin=co2-se,ymax=co2+se), width=0.2, position=position_dodge (0.6), colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=12), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", size = 0.1, linetype = "solid")) + labs(x=(""), y=("DOC (mg L-1)"))  + scale_color_brewer(name= "Incubation temperature", palette = "Set1") + scale_x_discrete("Time since last fire",labels = c("2019" ="3", "2015"="7", "2002"="20", "1971"="51")) 
+cratesplot2
+
+#Unburned
+#Set up a single exponential function for the data
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+#Subset to only examine the unburned samples
+unburned1 <-subset(inc, tsf == "0" & temp == "4" & rep == "1")
+unburned2 <-subset(inc, tsf == "0" & temp == "4" & rep == "2")
+unburned3 <-subset(inc, tsf == "0" & temp == "4" & rep == "3")
+unburned4 <-subset(inc, tsf == "0" & temp == "14" & rep == "1")
+unburned5 <-subset(inc, tsf == "0" & temp == "14" & rep == "2")
+unburned6 <-subset(inc, tsf == "0" & temp == "14" & rep == "3")
+
+#Set initial parameters
+a_start <- 1 #initial pool
+b_start <- 0.05 # constant rate
+
+exp1 <- nls(co2 ~ a*exp(-b*incday), data=unburned1, start=list(a=a_start, b=b_start))
+exp2 <- nls(co2 ~ a*exp(-b*incday), data=unburned2, start=list(a=a_start, b=b_start))
+exp3 <- nls(co2 ~ a*exp(-b*incday), data=unburned3, start=list(a=a_start, b=b_start))
+exp4 <- nls(co2 ~ a*exp(-b*incday), data=unburned4, start=list(a=a_start, b=b_start))
+exp5 <- nls(co2 ~ a*exp(-b*incday), data=unburned5, start=list(a=a_start, b=b_start))
+exp6 <- nls(co2 ~ a*exp(-b*incday), data=unburned6, start=list(a=a_start, b=b_start))
+
+
+#burned 2019 2X
+#Set up a single exponential function for the data
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+#Subset to only examine the unburned samples
+burned11 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "4" & rep == "1")
+burned22 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "4" & rep == "2")
+burned33 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "4" & rep == "3")
+burned44 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "14" & rep == "1")
+burned55 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "14" & rep == "2")
+burned66 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "14" & rep == "3")
+
+#Set initial parameters
+a_start <- 1 #initial pool
+b_start <- 0.05 # constant rate
+
+exp11 <- nls(co2 ~ a*exp(-b*incday), data=burned11, start=list(a=a_start, b=b_start))
+exp22 <- nls(co2 ~ a*exp(-b*incday), data=burned22, start=list(a=a_start, b=b_start))
+exp33 <- nls(co2 ~ a*exp(-b*incday), data=burned33, start=list(a=a_start, b=b_start))
+exp44 <- nls(co2 ~ a*exp(-b*incday), data=burned44, start=list(a=a_start, b=b_start))
+exp55 <- nls(co2 ~ a*exp(-b*incday), data=burned55, start=list(a=a_start, b=b_start))
+exp66 <- nls(co2 ~ a*exp(-b*incday), data=burned66, start=list(a=a_start, b=b_start))
+
+
+#burned 2019 3X
+#Set up a single exponential function for the data
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+#Subset to only examine the unburned samples
+burned7 <-subset(inc, tsf == "3"  & timesburned == "3" & temp == "4" & rep == "1")
+burned8 <-subset(inc, tsf == "3"  & timesburned == "3" & temp == "4" & rep == "2")
+burned9 <-subset(inc, tsf == "3"  & timesburned == "3" & temp == "4" & rep == "3")
+burned10 <-subset(inc, tsf == "3" & timesburned == "3" & temp == "14" & rep == "1")
+burned11 <-subset(inc, tsf == "3" & timesburned == "3" & temp == "14" & rep == "2")
+burned12 <-subset(inc, tsf == "3" & timesburned == "3" & temp == "14" & rep == "3")
+
+#Set initial parameters
+a_start <- 1 #initial pool
+b_start <- 0.05 # constant rate
+
+exp7 <- nls(co2 ~ a*exp(-b*incday), data=burned7, start=list(a=a_start, b=b_start))
+exp8 <- nls(co2 ~ a*exp(-b*incday), data=burned8, start=list(a=a_start, b=b_start))
+exp9 <- nls(co2 ~ a*exp(-b*incday), data=burned9, start=list(a=a_start, b=b_start))
+exp10 <- nls(co2 ~ a*exp(-b*incday), data=burned10, start=list(a=a_start, b=b_start))
+exp11 <- nls(co2 ~ a*exp(-b*incday), data=burned11, start=list(a=a_start, b=b_start))
+exp12 <- nls(co2 ~ a*exp(-b*incday), data=burned12, start=list(a=a_start, b=b_start))
+
+
+#burned 2015 4X
+#Set up a single exponential function for the data
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+#Subset to only examine the unburned samples
+burned13 <-subset(inc, tsf == "7" & temp == "4" & rep == "1")
+burned14 <-subset(inc, tsf == "7" & temp == "4" & rep == "2")
+burned15 <-subset(inc, tsf == "7" & temp == "4" & rep == "3")
+burned16 <-subset(inc, tsf == "7" & temp == "14" & rep == "1")
+burned17 <-subset(inc, tsf == "7" & temp == "14" & rep == "2")
+burned18 <-subset(inc, tsf == "7" & temp == "14" & rep == "3")
+
+#Set initial parameters
+a_start <- 1 #initial pool
+b_start <- 0.05 # constant rate
+
+exp13 <- nls(co2 ~ a*exp(-b*incday), data=burned13, start=list(a=a_start, b=b_start))
+exp14 <- nls(co2 ~ a*exp(-b*incday), data=burned14, start=list(a=a_start, b=b_start))
+exp15 <- nls(co2 ~ a*exp(-b*incday), data=burned15, start=list(a=a_start, b=b_start))
+exp16 <- nls(co2 ~ a*exp(-b*incday), data=burned16, start=list(a=a_start, b=b_start))
+exp17 <- nls(co2 ~ a*exp(-b*incday), data=burned17, start=list(a=a_start, b=b_start))
+exp18 <- nls(co2 ~ a*exp(-b*incday), data=burned18, start=list(a=a_start, b=b_start))
+
+
+#burned 2002 burned once
+#Set up a single exponential function for the data
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+#Subset to only examine the unburned samples
+burned19 <-subset(inc, tsf == "20" & temp == "4" & rep == "1")
+burned20 <-subset(inc, tsf == "20" & temp == "4" & rep == "2")
+burned21 <-subset(inc, tsf == "20" & temp == "4" & rep == "3")
+burned22 <-subset(inc, tsf == "20" & temp == "14" & rep == "1")
+burned23 <-subset(inc, tsf == "20" & temp == "14" & rep == "2")
+burned24 <-subset(inc, tsf == "20" & temp == "14" & rep == "3")
+
+#Set initial parameters
+a_start <- 1 #initial pool
+b_start <- 0.05 # constant rate
+
+exp19 <- nls(co2 ~ a*exp(-b*incday), data=burned19, start=list(a=a_start, b=b_start))
+exp20 <- nls(co2 ~ a*exp(-b*incday), data=burned20, start=list(a=a_start, b=b_start))
+exp21 <- nls(co2 ~ a*exp(-b*incday), data=burned21, start=list(a=a_start, b=b_start))
+exp22 <- nls(co2 ~ a*exp(-b*incday), data=burned22, start=list(a=a_start, b=b_start))
+exp23 <- nls(co2 ~ a*exp(-b*incday), data=burned23, start=list(a=a_start, b=b_start))
+exp24 <- nls(co2 ~ a*exp(-b*incday), data=burned24, start=list(a=a_start, b=b_start))
+
+
+#burned 1971 burned once
+#Set up a single exponential function for the data
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+head(inc)
+
+#Subset to only examine the unburned samples
+burned25 <-subset(inc, tsf == "51" & temp == "4" & rep == "1")
+burned26 <-subset(inc, tsf == "51" & temp == "4" & rep == "2")
+burned27 <-subset(inc, tsf == "51" & temp == "4" & rep == "3")
+burned28 <-subset(inc, tsf == "51" & temp == "14" & rep == "1")
+burned29 <-subset(inc, tsf == "51" & temp == "14" & rep == "2")
+burned30 <-subset(inc, tsf == "51" & temp == "14" & rep == "3")
+
+#Set initial parameters
+a_start <- 1 #initial pool
+b_start <- 0.05 # constant rate
+
+exp25 <- nls(co2 ~ a*exp(-b*incday), data=burned25, start=list(a=a_start, b=b_start))
+exp26 <- nls(co2 ~ a*exp(-b*incday), data=burned26, start=list(a=a_start, b=b_start))
+exp27 <- nls(co2 ~ a*exp(-b*incday), data=burned27, start=list(a=a_start, b=b_start))
+exp28 <- nls(co2 ~ a*exp(-b*incday), data=burned28, start=list(a=a_start, b=b_start))
+exp29 <- nls(co2 ~ a*exp(-b*incday), data=burned29, start=list(a=a_start, b=b_start))
+exp30 <- nls(co2 ~ a*exp(-b*incday), data=burned30, start=list(a=a_start, b=b_start))
+
+
+#Take the mean of replicates
+
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+# subset to group all 3 replicates
+unbur4 <-subset(inc, tsf == "0" & temp == "4")
+unbur14 <-subset(inc, tsf == "0" & temp == "14")
+b1971_4 <-subset(inc, tsf == "51" & temp == "4")
+b1097_14 <-subset(inc, tsf == "51" & temp == "14")
+b2002_4 <-subset(inc, tsf == "20" & temp == "4")
+b2002_14 <-subset(inc, tsf == "20" & temp == "14")
+b2015_4 <-subset(inc, tsf == "7" & temp == "4")
+b2015_14 <-subset(inc, tsf == "7" & temp == "14")
+b20192x_4 <-subset(inc, tsf == "3" & timesburned == "2" & temp == "4")
+b20192x_14 <-subset(inc, tsf == "3" & timesburned == "2" &temp == "14")
+b20193x_4 <-subset(inc, tsf == "3" & timesburned == "3" & temp == "4")
+b20193x_14 <-subset(inc, tsf == "3" & timesburned == "3" &temp == "14")
+
+# take the mean of all 3 replicates
+bsum1 <- summarySE(unbur4, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum2 <- summarySE(unbur14, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum3 <- summarySE(b1971_4, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum4 <- summarySE(b1097_14, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum5 <- summarySE(b2002_4, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum6 <- summarySE(b2002_14, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum7 <- summarySE(b2015_4, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum8 <- summarySE(b2015_14, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum9 <- summarySE(b20192x_4, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum10 <- summarySE(b20192x_14, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum11 <- summarySE(b20193x_4, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+bsum12 <- summarySE(b20193x_14, measurevar="co2", groupvars=c("tsf", "temp", "incday", "timesburned"), na.rm=TRUE)
+
+
+#Figure SI6
+
+#Unburned only
+
+unb_long <- merge(bsum1, bsum2, all=T)
+head(unb_long)
+
+unb_long$temp <- factor(unb_long$temp, levels= c("4","14")) #this ensures order
+
+#plot one figure with unburned values at 4 and 14 oC
+cratesUNB <- ggplot(unb_long, aes(x= incday, y=co2, fill=temp)) + ggtitle("(A) Reference")+ geom_point(size=5, shape=21) + geom_errorbar(aes(ymin=co2-se,ymax=co2+se), width=0.2, colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=16), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +  ylim(0, 1.25) + ylab(bquote('('*mu~'g' ~CO[2]~day^-1*')')) + xlab("") + scale_x_continuous("Incubation time (days)", limits=c(0,30), breaks=c(0, 2, 6, 15, 30)) + scale_fill_manual("Observed", values =c("4" = "goldenrod3", "14" = "deepskyblue4"), breaks =c("4", "14")) + geom_line (aes(color=temp), linewidth = 1, method="nlsLM", formula ="y~a*exp(-b*x)", stat = "smooth", method.args=list(start=c(a=a_start, b=b_start)), se= FALSE) + scale_color_manual ("Modeled", values=c("4" = "goldenrod3", "14" = "deepskyblue4"), breaks=c("4" ="4", "14"="14"))
+cratesUNB
+
+#Unburned and time since fire
+
+#Merge the results in one single dataframe including unburned 
+merged_df4 <- bind_rows(bsum3, bsum5, bsum7, bsum9, bsum11)
+merged_df14 <- bind_rows(bsum4, bsum6, bsum8, bsum10, bsum12)
+
+merged_df4$tsf <- factor(merged_df4$tsf, levels= c("3","7","20","51")) #this ensures order
+merged_df4$timesburned <- factor(merged_df4$timesburned, levels= c("1","2","3","4")) #this ensures order
+merged_df4$temp <- factor(merged_df4$temp, levels= c("4","14")) #this ensures order
+
+head(merged_df4)
+
+crates4 <- ggplot(merged_df4, aes(x= incday, y=co2, fill=tsf)) + ggtitle("(B), Burned, 4 oC")+ geom_point(size=5, shape=21) + geom_errorbar(aes(ymin=co2-se,ymax=co2+se), width=0.2, colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=16), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) +  ylim(0, 0.7) + ylab(bquote('('*mu~'g' ~CO[2]~day^-1*')')) + xlab("") + scale_x_continuous("Incubation time (days)", limits=c(0,30), breaks=c(0, 2, 6, 15, 30)) + scale_fill_manual("TSF (years)", values=c("3" ="dark green", "7"="darkorchid2", "20"="gold", "51"="blue"), breaks =c("3" ="3", "7"="7", "20"="20", "51"="51")) + geom_smooth (aes(color=tsf, linetype=timesburned), linewidth = 1, method="nlsLM", formula ="y~a*exp(-b*x)", stat = "smooth", method.args=list(start=c(a=a_start, b=b_start)), se= FALSE) + scale_color_manual("TSF (years)", values =c("3" ="dark green", "7"="darkorchid2", "20"="gold", "51"="blue"), breaks =c("3" ="3", "7"="7", "20"="20", "51"="51")) 
+crates4
+
+merged_df14 <- bind_rows(bsum4, bsum6, bsum8, bsum10, bsum12)
+merged_df14$tsf <- factor(merged_df14$tsf, levels= c("3","7","20","51")) #this ensures order
+merged_df14$timesburned <- factor(merged_df14$timesburned, levels= c("1","2","3","4")) #this ensures order
+merged_df14$temp <- factor(merged_df14$temp, levels= c("4","14")) #this ensures order
+
+head(merged_df14)
+
+crates14 <- ggplot(merged_df14, aes(x= incday, y=co2, fill=tsf)) + ggtitle("(C), Burned, 14 oC")+ geom_point(size=5, shape=21) + geom_errorbar(aes(ymin=co2-se,ymax=co2+se), width=0.2, colour= "black") + theme_bw() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=16,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=16), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "right", legend.key.height = unit(1, "null"), legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + ylim(0, 1.25) + ylab("") + xlab("") + scale_x_continuous("Incubation time (days)", limits=c(0,30), breaks=c(0, 2, 6, 15, 30)) + scale_fill_manual("TSF (years)", values=c("3" ="dark green", "7"="darkorchid2", "20"="gold", "51"="blue"), breaks =c("3" ="3", "7"="7", "20"="20", "51"="51")) + geom_smooth (aes(color=tsf, linetype=timesburned), linewidth = 1, method="nlsLM", formula ="y~a*exp(-b*x)", stat = "smooth", method.args=list(start=c(a=a_start, b=b_start)), se= FALSE) + scale_color_manual("TSF (years)", values =c("3" ="dark green", "7"="darkorchid2", "20"="gold", "51"="blue"), breaks =c("3" ="3", "7"="7", "20"="20", "51"="51")) + scale_linetype_manual("Times burned", values=c("1"="solid", "2"="dashed", "3"="dotted", "4"="dotdash"))
+crates14
+
+grid.arrange (cratesUNB, crates4, crates14, nrow=2, ncol=2)
+
+
+#ANOVA Repeated measures
+inc$subject_id <- seq.int(nrow(inc))
+RM1 <-aov(co2 ~ incday + Error(Sample_ID/incday), data = inc) #Includes unburned
+summary(RM1)
+
+#ANOVA nested per day 
+
+inc <- read.csv("kfc_sr_incubation.csv") # mineralization rates per day
+
+#Select unburned samples only
+
+#Day 2 unburned
+#Remember we only have 1 unburned sample with 3 replicates per day
+subset_un1 <-subset(inc, burn == "Unburned") # Selected unburned samples only
+subset_un1$subject_id <- seq.int(nrow(subset_un1)) # creates a new column for subjects
+RM2a <-aov(co2 ~ incday*temp + Error(subject_id), data = subset_un1) # testing interaction of time and temperature
+summary(RM2a)
+
+#Day 2 unburned
+subset_unbd2 <-subset(inc, incday == "2" & burn == "Unburned") 
+day2unb <-aov(co2 ~ temp + Error(subject_id), data = subset_unbd2) # test effect of temperature in unburned day 2
+summary(day2unb)
+
+#Day 6 unburned
+subset_unbd6 <-subset(inc, incday == "6" & burn == "Unburned") 
+day6unb <-aov(co2 ~ temp + Error(rep/temp), data = subset_unbd6) # test effect of temperature in unburned day 6
+summary(day6unb)
+
+#Day 15 unburned
+subset_unbd15 <-subset(inc, incday == "15" & burn == "Unburned") 
+day15unb <-aov(co2 ~ temp + Error(rep/temp), data = subset_unbd15) # test effect of temperature in unburned day 15
+summary(day15unb)
+
+#Day 30 unburned
+subset_unbd30 <-subset(inc, incday == "30" & burn == "Unburned") 
+day30unb <-aov(co2 ~ temp + Error(rep/temp), data = subset_unbd30) # test effect of temperature in unburned day 30
+summary(day30unb)
+
+
+#Select burned samples only
+
+inc_burned <- inc[-c(1:3), ]#Remove first 3 rows that belong to the unburned treatment
+
+#ANOVA Repeated measures
+
+RM3 <-lmer(co2 ~ incday*temp*tsf + (1 | Sample_ID), data = inc_burned)
+summary(RM3) # here only temperature is significant AIC 69
+
+RM3_reburn <-lmer(co2 ~ incday*temp*tsf*timesburned + (1 | Sample_ID), data = inc_burned)
+summary(RM3_reburn) # here only temperature is significant  AIC 160
+
+AIC(RM3, RM3_reburn)
+
+
+subset_un2 <-subset(inc_burned, incday == "2") #Select Day 2 only# not needed bc inc time was not significant above
+day2b <- lmer(co2 ~ incday*temp*tsf*timesburned + (1 | Sample_ID), data = subset_un2) # not needed bc inc time was not significant above
+summary(day2b)
+
+
+subset_un6 <-subset(inc_burned, incday == "6") #Select Day 6 only# not needed bc inc time was not significant above
+day6b <- lmer(co2 ~ incday*temp*tsf*timesburned + (1 | Sample_ID), data = subset_un6)# not needed bc inc time was not significant above
+summary(day6b)
+
+
+subset_un15 <-subset(inc_burned, incday == "15") #Select Day 15 only# not needed bc inc time was not significant above
+day15b <- lmer(co2 ~ incday*temp*tsf*timesburned + (1 | Sample_ID), data = subset_un15)# not needed bc inc time was not significant above
+summary(day15b)
+
+subset_un30 <-subset(inc_burned, incday == "30") #Select Day 30 only# not needed bc inc time was not significant above
+day30b <- lmer(co2 ~ incday*temp*tsf*timesburned + (1 | Sample_ID), data = subset_un30)# not needed bc inc time was not significant above
+summary(day30b)
+
+
+
+#Figure SI7
+# Cumulative bar graphs Units ug total C-CO2 per g peat C
+
+
+cum <- read.csv("kfc_sr_incubation_cum.csv") # total CO2 lost during incubation
+
+head(cum)
+
+#Factor fire
+cum$tsf<- factor(cum$tsf, levels= c("0","3", "7", "20", "51")) #this ensures order
+cum$timesburned<- factor(cum$timesburned, levels= c("0","1", "2", "3", "4")) #this ensures order
+
+co2cum_nounburned <- cum[-c(1:3), ]#Remove first 3 rows that belong to the unburned treatment
+co2cumB4 <-subset(co2cum_nounburned, temp == "4") # select only the 4oC temperature treatment
+
+co2cum_b <- summarySE(co2cumB4, measurevar="cum", groupvars=c("tsf", "timesburned"), na.rm=TRUE)#stats
+
+#Bar plot A for 4oC
+co2cummulative4 <- ggplot(co2cum_b, aes(x= tsf, y=cum, fill=timesburned)) + ggtitle("(A), 4 oC") + geom_bar(stat="identity", position="dodge", width=0.4, colour="black") + geom_errorbar(aes(ymin=cum-se,ymax=cum+se), width=0.2, position=position_dodge (0.4), colour= "black") + ylim(0,12.5) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=14,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "top", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + ylab(bquote('Total heterotrophic respiration ( '*mu~'g' ~C-CO[2]~ g^-1 ~C*')')) + scale_fill_viridis("Times burned", discrete = TRUE, option = "D") + scale_x_discrete("Time since last fire (years)", labels = c("3" ="3", "7"="7", "20"="20", "51"="51"))
+co2cummulative4
+
+
+#Bar plot B for 14oC
+
+cum <- read.csv("kfc_sr_incubation_cum.csv") # total CO2 lost during incubation
+head(cum)
+cum$tsf<- factor(cum$tsf, levels= c("0","3", "7", "20", "51")) #this ensures order
+cum$timesburned<- factor(cum$timesburned, levels= c("0","1", "2", "3", "4")) #this ensures order
+co2cum_nounb <- cum[-c(19:21), ]#Remove the 3 rows that belong to the unburned treatment under temperature 14oc
+co2cumB14 <-subset(co2cum_nounb, temp == "14") # select only the 14oC temperature treatment
+
+co2cum_c <- summarySE(co2cumB14, measurevar="cum", groupvars=c("tsf", "timesburned"), na.rm=TRUE)#stats
+
+co2cummulative14 <- ggplot(co2cum_c, aes(x= tsf, y=cum, fill=timesburned)) + ggtitle("(B), 14 oC") + geom_bar(stat="identity", position="dodge", width=0.4, colour="black") + geom_errorbar(aes(ymin=cum-se,ymax=cum+se), width=0.2, position=position_dodge (0.4), colour= "black") + ylim(0,12.5) + annotation_custom(grid::linesGrob(y = c(0, 0), gp = grid::gpar(lwd = 3))) +  annotation_custom(grid::linesGrob(x = c(0, 0), gp = grid::gpar(lwd = 3))) + theme_minimal() + theme(panel.grid.major.x = element_blank(), axis.title.y= element_text(colour="black", face="bold", size=13,margin = margin(t = 0, r = 20, b = 0, l = 0)), axis.text.y = element_text(colour="black", face="bold", size=16), axis.text.x=element_text(colour="black", face="bold", size=14, hjust=0.5), axis.title.x=element_text(colour="black", face="bold", size=16, margin = margin(t = 20, r = 20, b = 0, l = 0)), axis.ticks.x=element_line(colour="black")) + theme(legend.position = "none", legend.text=element_text(size=12), legend.background=element_rect(color = "black", fill = "white", linewidth = 0.1, linetype = "solid")) + ylab("") + scale_fill_viridis("Times burned", discrete = TRUE, option = "D") + scale_x_discrete("Time since last fire (years)", labels = c("3" ="3", "7"="7", "20"="20", "51"="51"))
+co2cummulative14
+
+grid.arrange(co2cummulative4, co2cummulative14, nrow=1, ncol=2)
+
