@@ -1,0 +1,39 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: >-
+  R code and data for Post-wildfire soil respiration in
+  tundra is driven by plant community composition and soil
+  moisture in the late growing season
+message: >-
+  If you use this dataset, please cite it using the metadata
+  from this file.
+type: dataset
+authors:
+  - given-names: Fernanda
+    family-names: Santos
+    email: santosf@ornl.gov
+    name-particle: Fernanda
+    affiliation: Oak Ridge National Laboratory
+    orcid: 'https://orcid.org/0000-0001-9155-5623'
+identifiers:
+  - type: url
+    value: >-
+      https://github.com/fsantos13/NGEEA_tundra_fire_soilrespiration
+    description: NGEEA_tundra_wildfire
+abstract: >-
+  R code for figures and analysis related to the paper:
+  Santos et al. 2026 Post-wildfire soil respiration in
+  tundra is driven by plant community composition and soil
+  moisture in the late growing season in Environmental
+  Research Letters. All data are publicly in ESS-DIVE.
+keywords:
+  - Arctic
+  - tundra
+  - wildfire
+  - soil respiration
+  - organic layer
+  - thaw depth
+license: Apache-2.0
+version: '1'
